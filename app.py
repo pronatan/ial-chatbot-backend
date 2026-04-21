@@ -20,6 +20,7 @@ app = Flask(__name__)
 CORS(app, origins=[
     "https://ialcorretora.com.br",
     "https://www.ialcorretora.com.br",
+    "https://api.ialcorretora.com.br",
     "http://localhost:3000",
     "http://localhost:5500",
     "http://127.0.0.1:5500",

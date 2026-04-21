@@ -7,7 +7,7 @@ Backend do assistente virtual da **IAL Corretora de Seguros**, construído com F
 ## Repositório
 
 **GitHub:** https://github.com/pronatan/ial-chatbot-backend  
-**Produção:** https://ial-chatbotbackend.onrender.com  
+**Produção:** https://api.ialcorretora.com.br  
 **Frontend:** https://ialcorretora.com.br
 
 ---
@@ -32,7 +32,7 @@ Backend do assistente virtual da **IAL Corretora de Seguros**, construído com F
 
 ```
 Frontend (Hostgator)          Backend (Render)
-ialcorretora.com.br    →      ial-chatbotbackend.onrender.com
+ialcorretora.com.br    →      api.ialcorretora.com.br
 chatbot-backend.js            app.py (Flask)
                                   ↓
                               Groq API
