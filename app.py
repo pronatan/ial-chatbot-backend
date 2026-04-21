@@ -7,6 +7,13 @@ import base64
 import io
 import os
 
+# Carrega .env em desenvolvimento local (ignorado em produção)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__)
 
 # CORS: permite o site da IAL e localhost (dev)
