@@ -18,6 +18,8 @@ Backend do assistente virtual da **IAL Corretora de Seguros**, construído com F
 |---|---|
 | Python 3.11 | Linguagem |
 | Flask 3.0 | Framework web |
+| **Flask-Limiter** | **Rate limiting (proteção contra spam/DDoS)** |
+| **PyJWT** | **Autenticação via JSON Web Tokens** |
 | Groq API | Inferência do modelo de IA |
 | Llama 4 Scout 17B | Modelo multimodal (texto + imagens) |
 | pdfplumber | Extração de texto de PDFs |
@@ -25,6 +27,23 @@ Backend do assistente virtual da **IAL Corretora de Seguros**, construído com F
 | Pillow | Processamento de imagens |
 | Gunicorn | Servidor WSGI para produção |
 | Render.com | Hospedagem do backend (free tier) |
+
+---
+
+## Segurança
+
+### 🔒 Camadas de proteção implementadas:
+
+| Camada | Implementação | Proteção contra |
+|---|---|---|
+| **JWT** | Token obrigatório em todas as requisições | Acesso não autorizado, replay attacks |
+| **Rate Limiting** | 30 req/min, 500 req/dia por IP | Spam, DDoS, abuso de API |
+| **CORS** | Lista branca de origens permitidas | Cross-site scripting (XSS) |
+| **Input Validation** | Sanitização de texto, validação de arquivos | Injection attacks, malware upload |
+| **Security Headers** | HSTS, X-Frame-Options, CSP, etc. | Clickjacking, MIME sniffing |
+| **File Type Check** | MIME type + extensão validados | Upload de executáveis/scripts maliciosos |
+| **Size Limits** | Mensagem: 2000 chars, Arquivo: 10MB | Resource exhaustion |
+| **Secret Rotation** | JWT_SECRET via env var | Comprometimento de chaves |
 
 ---
 
@@ -47,7 +66,7 @@ O frontend é estático (HTML/CSS/JS) hospedado no Hostgator. O backend é uma A
 ## Endpoints
 
 ### `GET /api/health`
-Verifica se o backend está no ar.
+Verifica se o backend está no ar. **Não requer autenticação.**
 
 **Resposta:**
 ```json
@@ -56,7 +75,31 @@ Verifica se o backend está no ar.
   "message": "Backend IAL funcionando!",
   "model": "meta-llama/llama-4-scout-17b-16e-instruct",
   "multimodal": true,
+  "security": ["JWT", "CORS", "RateLimit", "InputValidation", "SecurityHeaders"],
   "suporta": ["texto", "imagens (jpg/png/webp)", "PDF", "DOCX", "TXT"]
+}
+```
+
+---
+
+### `POST /api/token`
+Gera um JWT para iniciar uma sessão de chat. **Chamado automaticamente pelo frontend ao abrir o chat.**
+
+**Rate limit:** 20 requisições por hora por IP
+
+**Body (JSON):**
+```json
+{
+  "session_id": "string_opcional"
+}
+```
+
+**Resposta:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "session_id": "abc123def456",
+  "expires_in": 86400
 }
 ```
 
@@ -65,13 +108,15 @@ Verifica se o backend está no ar.
 ### `POST /api/chat`
 Envia uma mensagem (e opcionalmente um arquivo) para o assistente.
 
+**Requer:** `Authorization: Bearer <jwt>`  
+**Rate limit:** 30 requisições por minuto, 500 por dia por IP
+
 **Aceita dois formatos:**
 
 #### Só texto — `application/json`
 ```json
 {
-  "message": "O que é proteção veicular?",
-  "session_id": "usuario_123"
+  "message": "O que é proteção veicular?"
 }
 ```
 
@@ -79,16 +124,21 @@ Envia uma mensagem (e opcionalmente um arquivo) para o assistente.
 | Campo | Tipo | Descrição |
 |---|---|---|
 | `message` | string | Texto da mensagem (opcional se houver arquivo) |
-| `session_id` | string | ID da sessão para manter histórico |
 | `file` | file | Imagem (jpg/png/webp), PDF, DOCX ou TXT — máx. 10MB |
 
 **Resposta:**
 ```json
 {
   "response": "A proteção veicular é uma alternativa ao seguro tradicional...",
-  "session_id": "usuario_123"
+  "session_id": "abc123def456"
 }
 ```
+
+**Erros:**
+- `401` — Token ausente, inválido ou expirado
+- `400` — Mensagem/arquivo inválido
+- `413` — Arquivo muito grande
+- `429` — Rate limit excedido
 
 **Como o arquivo é processado:**
 - **Imagem** → convertida para base64 e enviada diretamente ao modelo multimodal
@@ -101,9 +151,13 @@ Envia uma mensagem (e opcionalmente um arquivo) para o assistente.
 ### `POST /api/clear-session`
 Limpa o histórico de uma sessão.
 
+**Requer:** `Authorization: Bearer <jwt>`  
+**Rate limit:** 10 requisições por minuto
+
+**Resposta:**
 ```json
 {
-  "session_id": "usuario_123"
+  "message": "Sessão limpa"
 }
 ```
 
@@ -173,6 +227,17 @@ O backend está configurado para deploy automático no Render via `Procfile` e `
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `GROQ_API_KEY` | ✅ Sim | Chave da API Groq (https://console.groq.com) |
+| `JWT_SECRET` | ⚠️ Recomendado | Secret para assinar JWTs (gera automaticamente se omitido, mas use um fixo em produção) |
+
+**Gerando um JWT_SECRET seguro:**
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Adicione no Render → Settings → Environment:
+```
+JWT_SECRET=seu_secret_gerado_aqui
+```
 
 ---
 
